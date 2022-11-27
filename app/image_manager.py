@@ -2,10 +2,13 @@ from movable_objects import SQ
 from bounding_object_cache import BoundingObjectCache
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import QFileDialog, QGraphicsScene
+from object_detector import ObjectDetector
+import uuid
 
 class ImageManager:
 
     def __init__(self, video_manager) -> None:
+        self.object_detector = ObjectDetector()
         self.current_label = None
         self.current_frame = None
         self.current_frame_index = None
@@ -22,6 +25,38 @@ class ImageManager:
         self._set_defaults("Not Set")
         self.ui.setVoc.clicked.connect(self.set_voc_foler)
         self.ui.setImg.clicked.connect(self.set_saved_image_dir)
+        self.ui.pushButton_2.clicked.connect(self.set_model)
+        self.ui.pushButton_3.clicked.connect(self.save)
+
+    def save(self):
+        if (
+            self.saved_image_dir != None and
+            self.saved_voc_dir != None and
+            self.current_label != None
+            ):
+            self.cache.save_data(
+                self.saved_image_dir,
+                self.saved_voc_dir,
+                self.current_label
+            )
+            self._set_unsaved_mods_text(f"No Unsaved Changes")
+
+        else:
+            print("issue")
+
+    def maybe_set_current_label(self, name):
+        if name and not self.ui.checkBox.isChecked():
+            self.ui.textEdit.setText(name)
+            self.set_label()
+            
+
+    def set_model(self):
+        file_path, _ = QFileDialog.getOpenFileName(self.video_manager.parent, "Select video media",
+                ".", "ModelFiles (*.tflite)")
+        if file_path:
+            self.object_detector.set_detector(file_path)
+            model_name = file_path.split("/")[-1]
+            self._set_model_target_text(model_name)
 
     def set_voc_foler(self):
         folder = str(QFileDialog.getExistingDirectory(self.video_manager.parent, "Select Directory"))
@@ -73,16 +108,32 @@ class ImageManager:
         self.current_frame = frame
         self.current_frame_index = frame_index
         self.scene.addItem(pixmap)
-        self.add_exsisting_boxes(frame_index)
+        self.add_boxes(frame_index)
 
-    def add_exsisting_boxes(self, index):
+    def add_boxes(self, index):
         boxes = self.cache.get_all_boxes_from_index(index)
+        has_boxes = False
         for id, box in boxes.items():
+            has_boxes = True
             sq = SQ(self, self.current_frame, index, id, box)
             self.cache.add_sq_box_only(sq)
+        if not has_boxes:
+            self.add_object_detection_boxes(index)
+
+    def add_object_detection_boxes(self, index):
+        if self.object_detector.detector:
+            detections = self.object_detector.get_detected_loc_info(self.current_frame)
+            for detection in detections:
+                id = str(uuid.uuid4())
+                self.add_sq(index, id, detection)
+            print(detections)
+        
+    def add_sq(self, index, id, box):
+        sq = SQ(self, self.current_frame, index, id, box)
+        self.cache.add_sq_box_only(sq)
 
     def update_box_loc(self, index, id, locinfo):
-        self.cache.update(index, id, locinfo)
+        self.cache.update(index, id, locinfo, self.current_frame, self.current_label)
         unsaved = len(self.cache.not_yet_saved)
         if unsaved == 0:
             unsaved = "No"

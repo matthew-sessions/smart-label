@@ -61,6 +61,15 @@ class LocInfo:
     y: float
     w: float
     h: float
+    cat_name: str = None
+
+    @property
+    def xmax(self):
+        return self.x + self.w
+
+    @property
+    def ymax(self):
+        return self.y + self.h
 
     def get_adjusted_dims(
         self,
@@ -123,6 +132,7 @@ class SQ:
             locinfo,
             self
         )
+        self.image_manager.maybe_set_current_label(cords.cat_name if cords else None)
         self.text = QGraphicsTextItem(self.image_manager.current_label)
         self.text.setPos(locinfo.x, locinfo.y)
  
