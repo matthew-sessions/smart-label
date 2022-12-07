@@ -13,9 +13,12 @@ class VideoManager:
     cap = None
     cap_len = None
     scroller_ratio = 0
+    frame_bump = 0
+    max_frames = 50
     last_img = None
     last_frame_index = 0
     painter = None
+    last_rolling_index = 0
 
     def __init__(self, parent) -> None:
         self.parent = parent
@@ -78,11 +81,18 @@ class VideoManager:
         w = int(self.parent.ui.navFrame.width() - 1)
         if self.cap:
             self.scroller_ratio = self.cap_len / w
+            self.frame_bump = int(w / self.max_frames)
 
     def set_frame(self, e=None, move=False):
         if self.cap:
             if e:
-                frame_index = int(e.x() * self.scroller_ratio)
+                n = int(e.x() * self.scroller_ratio) + (self.max_frames//2)
+                n = int(n - (n % self.max_frames))
+                frame_index = int(n)
+                if frame_index == self.last_rolling_index:
+                    return
+                else:
+                    self.last_rolling_index = frame_index
             else:
                 frame_index = self.last_frame_index
             frame = self.get_display_frame(frame_index)
